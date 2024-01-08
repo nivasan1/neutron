@@ -944,8 +944,6 @@ github.com/neutron-org/admin-module v1.0.0 h1:mmX5U6jz4rX+lk8SB5Bx0Lsugu9bh4PCRE
 github.com/neutron-org/admin-module v1.0.0/go.mod h1:INknneN2W3Fr9Eld7SpfLRdjyHR1muzFbbqXln1ixic=
 github.com/neutron-org/cosmos-sdk v0.47.6-neutron h1:agxUiBWlAGQf5+8A7e5omYrpgbylL+SoSQlCVuQTd3Y=
 github.com/neutron-org/cosmos-sdk v0.47.6-neutron/go.mod h1:7BmlRp0txKo2UZ01OLq4DGEjgLDiPgmpRpjLOq89Jys=
-github.com/neutron-org/neutron v1.1.0 h1:z8lWbZnXOs2bRe+TptgVl2divo+V9mAG1nWYNGprOeQ=
-github.com/neutron-org/neutron v1.1.0/go.mod h1:/7wnWxAbDz0XPPnYcQGiq09qeVk8VfbOPLxa1SZH254=
 github.com/neutron-org/wasmd v0.45.0 h1:K3WpYYTP9Msd7cLtdIau8VBUW1n1CC1qC/yaKPCYJsQ=
 github.com/neutron-org/wasmd v0.45.0/go.mod h1:k2/B7hBKbCEHhhOSaiv7UBHUR2fLVb003pnswasgG/w=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
