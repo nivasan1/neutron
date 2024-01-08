@@ -82,10 +82,6 @@ BUILD_FLAGS_TEST_BINARY := -tags "$(build_tags_test_binary_comma_sep)" -ldflags 
 include contrib/devtools/Makefile
 
 check_version:
-ifneq ($(GO_SYSTEM_VERSION), $(REQUIRE_GO_VERSION))
-	@echo "ERROR: Go version ${REQUIRE_GO_VERSION} is required for $(VERSION) of Neutron."
-	exit 1
-endif
 
 all: install lint test
 

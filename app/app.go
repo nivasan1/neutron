@@ -172,6 +172,9 @@ import (
 	auctionkeeper "github.com/skip-mev/block-sdk/x/auction/keeper"
 	rewardsaddressprovider "github.com/skip-mev/block-sdk/x/auction/rewards"
 	auctiontypes "github.com/skip-mev/block-sdk/x/auction/types"
+
+	"github.com/skip-mev/block-sdk/abci/checktx"
+	"github.com/skip-mev/block-sdk/block/base"
 )
 
 const (
@@ -341,8 +344,8 @@ type App struct {
 	sm *module.SimulationManager
 
 	// Custom checkTx handler
-	checkTxHandler mev_lane.CheckTx
-
+	checkTxHandler checktx.CheckTx
+	
 	// Lanes
 	Mempool   blocksdk.Mempool
 	MEVLane   auctionante.MEVLane
@@ -964,7 +967,9 @@ func New(
 	app.SetInitChainer(app.InitChainer)
 	app.SetBeginBlocker(app.BeginBlocker)
 
-	// initialize block-sdk Mempool
+	app.SetEndBlocker(app.EndBlocker)
+
+	// initialize lanes
 	maxTxs := 0 // no limit
 	cfg := blocksdkbase.LaneConfig{
 		Logger:          app.Logger(),
@@ -975,27 +980,33 @@ func New(
 		MaxTxs:          maxTxs,
 	}
 
-	baseLane := base_lane.NewDefaultLane(cfg)
+	baseLane := base_lane.NewDefaultLane(cfg, base.DefaultMatchHandler())
+
+	factory := mev_lane.NewDefaultAuctionFactory(app.GetTxConfig().TxDecoder(), signer_extraction_adapter.NewDefaultAdapter())
 
 	mevLane := mev_lane.NewMEVLane(
 		cfg,
-		mev_lane.NewDefaultAuctionFactory(app.GetTxConfig().TxDecoder(), signer_extraction_adapter.NewDefaultAdapter()),
+		factory,
+		factory.MatchHandler(),
 	)
 	app.MEVLane = mevLane
 	// initialize mempool
-	mempool := blocksdk.NewLanedMempool(
+	mempool, err := blocksdk.NewLanedMempool(
 		app.Logger(),
-		true,
 		[]blocksdk.Lane{
 			mevLane,  // mev-lane is first to prioritize bids being placed at the TOB
 			baseLane, // finally, all the rest of txs...
-		}...,
+		},
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	// set the mempool first
 	app.SetMempool(mempool)
 	app.Mempool = mempool
 
+	// create the ante-handler
 	anteHandler, err := NewAnteHandler(
 		HandlerOptions{
 			HandlerOptions: ante.HandlerOptions{
@@ -1020,13 +1031,13 @@ func New(
 	if err != nil {
 		panic(err)
 	}
-
-	app.SetAnteHandler(anteHandler)
-
-	app.SetEndBlocker(app.EndBlocker)
-
-	mevLane.SetAnteHandler(anteHandler)
-	baseLane.SetAnteHandler(anteHandler)
+	
+	// set ante-handlers
+	opts := []base.LaneOption{
+		base.WithAnteHandler(anteHandler),
+	}
+	baseLane.WithOptions(opts...)
+	mevLane.WithOptions(opts...)
 
 
 	app.SetEndBlocker(app.EndBlocker)
@@ -1040,14 +1051,25 @@ func New(
 	app.SetPrepareProposal(handler.PrepareProposalHandler())
 	app.SetProcessProposal(handler.ProcessProposalHandler())
 
-	checkTxHandler := mev_lane.NewCheckTxHandler(
-		app.BaseApp,
-		encodingConfig.TxConfig.TxDecoder(),
+	// check-tx
+	mevCheckTxHandler := checktx.NewMEVCheckTxHandler(
+		app,
+		app.GetTxConfig().TxDecoder(),
 		mevLane,
 		anteHandler,
+		app.BaseApp.CheckTx,
 		app.ChainID(),
 	)
-	app.SetCheckTx(checkTxHandler.CheckTx())
+
+	// wrap checkTxHandler with mempool parity handler
+	parityCheckTx := checktx.NewMempoolParityCheckTx(
+		app.Logger(),
+		mempool,
+		app.GetTxConfig().TxDecoder(),
+		mevCheckTxHandler.CheckTx(),
+	)
+
+	app.SetCheckTx(parityCheckTx.CheckTx())
 
 	// must be before Loading version
 	// requires the snapshot store to be created and registered as a BaseAppOption
@@ -1146,7 +1168,7 @@ func (app *App) CheckTx(req abci.RequestCheckTx) abci.ResponseCheckTx {
 }
 
 // SetCheckTx sets the checkTxHandler for the app.
-func (app *App) SetCheckTx(handler mev_lane.CheckTx) {
+func (app *App) SetCheckTx(handler checktx.CheckTx) {
 	app.checkTxHandler = handler
 }
 
